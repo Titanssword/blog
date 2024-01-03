@@ -1,5 +1,5 @@
-baseURL: "https://examplesite.com/"
-title: ExampleSite
+baseURL: "https://titanssword.github.io/"
+title: Sword's Blog 
 paginate: 5
 theme: PaperMod
 
@@ -59,8 +59,8 @@ params:
   # profile-mode
   profileMode:
     enabled: false # needs to be explicitly set
-    title: ExampleSite
-    subtitle: "This is subtitle"
+    title: Sword's Blog 
+    subtitle: "something about tech and myself"
     imageUrl: "<img location>"
     imageWidth: 120
     imageHeight: 120
