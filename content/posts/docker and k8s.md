@@ -9,6 +9,7 @@ categories:
 - container technologies
 ---
 
+
 # 容器技术
 
 ## 程序
@@ -73,9 +74,12 @@ Docker 在镜像的设计中，引入了层（layer）的概念。也就是说�
 所有的增删查改操作都只会作用在容器层，相同的文件上层会覆盖掉下层。知道这一点，就不难理解镜像文件的修改，比如修改一个文件的时候，首先会从上到下查找有没有这个文件，找到，就复制到容器层中，修改，修改的结果就会作用到下层的文件
 
 
-### 
+### Dockerfile
+
+Dockerfile 的设计思想，是使用一些标准的原语（即大写高亮的词语），描述我们所要构建的 Docker 镜像。并且这些原语，都是按顺序处理的。
 
 Dockerfile 中的每个原语执行后，都会生成一个对应的镜像层。
+
 ## 容器
 
 > 容器是一个“单进程”模型。
@@ -83,3 +87,85 @@ Dockerfile 中的每个原语执行后，都会生成一个对应的镜像层。
 一个正在运行的 Docker 容器，其实就是一个启用了多个 Linux Namespace 的应用进程，而这个进程能够使用的资源量，则受 Cgroups 配置的限制。
 
 对 Docker 项目来说，它最核心的原理实际上就是为待创建的用户进程：启用 Linux Namespace 配置；设置指定的 Cgroups 参数；切换进程的根目录（Change Root）。
+
+### docker exec
+
+一个进程的每种 Linux Namespace，都在它对应的 /proc/[进程号]/ns 下有一个对应的虚拟文件，并且链接到一个真实的 Namespace 文件上。有了这样一个可以“hold 住”所有 Linux Namespace 的文件，我们就可以对 Namespace 做一些很有意义事情了，比如：加入到一个已经存在的 Namespace 当中。
+
+一个进程，可以选择加入到某个进程已有的 Namespace 当中，从而达到“进入”这个进程所在容器的目的，这正是 docker exec 的实现原理。
+
+```
+#define _GNU_SOURCE
+#include <fcntl.h>
+#include <sched.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <stdio.h>
+
+#define errExit(msg) do { perror(msg); exit(EXIT_FAILURE);} while (0)
+
+int main(int argc, char *argv[]) {
+    int fd;
+    
+    fd = open(argv[1], O_RDONLY);
+    if (setns(fd, 0) == -1) {
+        errExit("setns");
+    }
+    execvp(argv[2], &argv[2]); 
+    errExit("execvp");
+}
+```
+
+这段代码的核心操作，则是通过 open() 系统调用打开了指定的 Namespace 文件，并把这个文件的描述符 fd 交给 setns() 使用。在 setns() 执行后，当前进程就加入了这个文件对应的 Linux Namespace 当中了。
+
+### docker commit
+
+docker commit，实际上就是在容器运行起来后，把最上层的“可读写层”，加上原先容器镜像的只读层，打包组成了一个新的镜像。当然，下面这些只读层在宿主机上是共享的，不会占用额外的空间。而由于使用了联合文件系统，你在容器里对镜像 rootfs 所做的任何修改，都会被操作系统先复制到这个可读写层，然后再修改。这就是所谓的：Copy-on-Write。而正如前所说，Init 层的存在，就是为了避免你执行 docker commit 时，把 Docker 自己对 /etc/hosts 等文件做的修改，也一起提交掉。
+
+### Volume
+
+允许你将宿主机上指定的目录或者文件，挂载到容器里面进行读取和修改操作。
+
+我们只需要在 rootfs 准备好之后，在执行 chroot 之前，把 Volume 指定的宿主机目录（比如 /home 目录），挂载到指定的容器目录（比如 /test 目录）在宿主机上对应的目录（即 /var/lib/docker/aufs/mnt/[可读写层 ID]/test）上，这个 Volume 的挂载工作就完成了。
+
+就是 Linux 的绑定挂载（bind mount）机制。它的主要作用就是，允许你将一个目录或者文件，而不是整个设备，挂载到一个指定的目录上。并且，这时你在该挂载点上进行的任何操作，只是发生在被挂载的目录或者文件上，而原挂载点的内容则会被隐藏起来且不受影响。
+
+### 全景图
+
+
+![https://static001.geekbang.org/resource/image/31/e5/3116751445d182687ce496f2825117e5.jpg?wh=2398*1419](https://static001.geekbang.org/resource/image/31/e5/3116751445d182687ce496f2825117e5.jpg?wh=2398*1419)
+
+这个容器进程“python app.py”，运行在由 Linux Namespace 和 Cgroups 构成的隔离环境里；而它运行所需要的各种文件，比如 python，app.py，以及整个操作系统文件，则由多个联合挂载在一起的 rootfs 层提供。这些 rootfs 层的最下层，是来自 Docker 镜像的只读层。
+
+在只读层之上，是 Docker 自己添加的 Init 层，用来存放被临时修改过的 /etc/hosts 等文件。
+
+而 rootfs 的最上层是一个可读写层，它以 Copy-on-Write 的方式存放任何对只读层的修改，容器声明的 Volume 的挂载点，也出现在这一层。
+
+## k8s
+
+![https://static001.geekbang.org/resource/image/8e/67/8ee9f2fa987eccb490cfaa91c6484f67.png?wh=1920*1080](https://static001.geekbang.org/resource/image/8e/67/8ee9f2fa987eccb490cfaa91c6484f67.png?wh=1920*1080)
+
+控制节点，即 Master 节点，由三个紧密协作的独立组件组合而成，它们分别是负责 API 服务的 kube-apiserver、负责调度的 kube-scheduler，以及负责容器编排的 kube-controller-manager。整个集群的持久化数据，则由 kube-apiserver 处理后保存在 Etcd 中。而计算节点上最核心的部分，则是一个叫作 kubelet 的组件。
+
+在 Kubernetes 项目中，kubelet 主要负责同容器运行时（比如 Docker 项目）打交道。而这个交互所依赖的，是一个称作 CRI（Container Runtime Interface）的远程调用接口，这个接口定义了容器运行时的各项核心操作，比如：启动一个容器需要的所有参数。
+
+![https://static001.geekbang.org/resource/image/16/06/16c095d6efb8d8c226ad9b098689f306.png?wh=1920*1080](https://static001.geekbang.org/resource/image/16/06/16c095d6efb8d8c226ad9b098689f306.png?wh=1920*1080)
+
+Kubernetes的核心设计理念是基于声明式API，通过定义“编排对象”和“服务对象”来实现平台级功能。使用Kubernetes启动容器化任务非常简便，只需编写一个YAML文件，定义Deployment对象并指定副本数，即可启动容器副本。这种声明式API带来了诸多好处，以及基于其实现的强大编排能力，使Kubernetes成为当今基础设施领域的重要工具。
+
+
+### Pod
+
+> 有些应用之间需要非常频繁的交互和访问；又或者，它们会直接通过本地文件进行信息交换。
+
+在常规环境下，这些应用往往会被直接部署在同一台机器上，通过 Localhost 通信，通过本地磁盘目录交换文件。而在 Kubernetes 项目中，这些容器则会被划分为一个“Pod”，Pod 里的容器共享同一个 Network Namespace、同一组数据卷，从而达到高效率交换信息的目的。
+
+### Service
+
+> 对于一个容器来说，它的 IP 地址等信息不是固定的，那么 Web 应用又怎么找到数据库容器的 Pod 呢？
+
+Kubernetes 项目的做法是给 Pod 绑定一个 Service 服务，而 Service 服务声明的 IP 地址等信息是“终生不变”的。这个 Service 服务的主要作用，就是作为 Pod 的代理入口（Portal），从而代替 Pod 对外暴露一个固定的网络地址。这样，对于 Web 应用的 Pod 来说，它需要关心的就是数据库 Pod 的 Service 信息。不难想象，Service 后端真正代理的 Pod 的 IP 地址、端口等信息的自动更新、维护，则是 Kubernetes 项目的职责。
+
+### Deployment
+
+有了 Pod 之后，我们希望能一次启动多个应用的实例，这样就需要 Deployment 这个 Pod 的多实例管理器
