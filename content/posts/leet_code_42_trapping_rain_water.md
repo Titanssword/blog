@@ -1,5 +1,5 @@
 ---
-title: 【题解】 42. 接雨水  
+title: [leetcode]  42. trapping rain water
 date: 2024-04-26
 tags:
 - leetcode
@@ -31,6 +31,13 @@ description: "idea: solving problems by two pointers"
 每次移动时，小的往里面移动，大的不动，
 如果移动之后，新小的比较之前小的大了，那么更新对应max标志位，这首也不需要计算水位。
 如果移动之后，新小的比较之前小的小了，那么不需要更新max标志位，但需要计算当前坑位的水位，并加入 结果中
+
+The approach involves identifying the land that can contain water, which is contingent upon the minimum height between the tallest barrier to the left and the tallest to the right, with the current position being lower than both. The crux of the solution is to determine the tallest sections on either side.
+left and right are indices that represent the moving pointers, and it is necessary to calculate the volume of water that can be contained at the current location.
+leftMax and rightMax denote the positions of the highest barriers currently on the left and right, respectively, with the stipulation that the indices (left, right) are always within the boundaries of (leftMax, rightMax).
+During each iteration, the pointer associated with the smaller height is moved inward, while the one with the larger height stays in place.
+If, after moving, the new smaller height is greater than the previous smaller height, then update the corresponding maximum height flag; in this case, there is no need to calculate the water level.
+If, after moving, the new smaller height is less than the previous smaller height, then there is no need to update the maximum height flag. However, you must calculate the water volume for the current depression and include it in the result.
 
 ```
 func trap(height []int) int {
