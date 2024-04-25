@@ -1,11 +1,11 @@
 ---
-title: 
+title: 【题解】 42. 接雨水  
 date: 2024-04-26
 tags:
 - leetcode
 categories:
 - algorithm
-description: "solving problems by two pointers"
+description: "idea: solving problems by two pointers"
 ---
 
 # 【题解】 42. 接雨水 
