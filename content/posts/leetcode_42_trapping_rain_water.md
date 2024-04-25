@@ -5,7 +5,7 @@ tags:
 - leetcode
 categories:
 - algorithm
-description: "idea: solving problems by two pointers"
+description: "solving problems by two pointers"
 ---
 
 #  [Solution] 42. 接雨水
