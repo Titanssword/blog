@@ -1,20 +1,17 @@
 ---
-title: [leetcode]  42. trapping rain water
+title: trapping rain water
 date: 2024-04-26
 tags:
-- leetcode
+- leetcode 
 categories:
 - algorithm
-description: "solving problems by two pointers"
+description: "two points"
 ---
 
-#  [Solution] 42. 接雨水
-
+### [solution] leetcode 42. trapping rain water
 [力扣题目链接](https://leetcode.cn/problems/trapping-rain-water/)
 
 给定 n 个非负整数表示每个宽度为 1 的柱子的高度图，计算按此排列的柱子，下雨之后能接多少雨水。
-
-示例 1：
 
 ![Alt text](https://assets.leetcode-cn.com/aliyun-lc-upload/uploads/2018/10/22/rainwatertrap.png)
 
